@@ -1,0 +1,28 @@
+[Unit]
+Description=Todo Board (Node + SQLite)
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=todolist
+Group=todolist
+WorkingDirectory=/opt/todolist
+# Replace 100.x.y.z with this mini pc's Tailscale IP (run: tailscale ip -4)
+Environment=HOST=100.x.y.z
+Environment=PORT=3000
+Environment=DB_PATH=/var/lib/todolist/todo.db
+# Adjust the node path if needed (run: command -v node)
+ExecStart=/usr/bin/node /opt/todolist/server.js
+Restart=on-failure
+RestartSec=5
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/todolist
+
+[Install]
+WantedBy=multi-user.target

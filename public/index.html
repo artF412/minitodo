@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Todo Board</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>Todo Board</h1>
+    <nav class="tabs" role="tablist">
+      <button id="tab-board" class="tab active" role="tab">Board</button>
+      <button id="tab-archive" class="tab" role="tab">Archive</button>
+    </nav>
+    <label class="toggle" id="overdue-wrap"><input type="checkbox" id="overdue-only"> Overdue only</label>
+    <div class="spacer"></div>
+    <a class="btn ghost" href="/api/export" download>Export JSON</a>
+    <button id="new-task" class="btn primary">+ New task</button>
+  </header>
+
+  <main>
+    <section id="board-view" class="board">
+      <div class="column" data-status="todo"><h2>To do <span class="count"></span></h2><div class="cards"></div></div>
+      <div class="column" data-status="doing"><h2>Doing <span class="count"></span></h2><div class="cards"></div></div>
+      <div class="column" data-status="done"><h2>Done <span class="count"></span><small>last 30 days</small></h2><div class="cards"></div></div>
+    </section>
+
+    <section id="archive-view" class="archive" hidden>
+      <input id="archive-search" type="search" placeholder="Search archived tasks…">
+      <div id="archive-list" class="cards"></div>
+    </section>
+  </main>
+
+  <dialog id="task-dialog">
+    <form id="task-form" method="dialog">
+      <div class="dialog-head">
+        <h3 id="dialog-title">Task</h3>
+        <button type="button" class="icon-btn" id="close-dialog" aria-label="Close">&times;</button>
+      </div>
+      <label>Title <input id="f-title" required maxlength="200"></label>
+      <label>Description <textarea id="f-desc" rows="3" maxlength="5000"></textarea></label>
+      <div class="row">
+        <label>Status
+          <select id="f-status">
+            <option value="todo">To do</option>
+            <option value="doing">Doing</option>
+            <option value="done">Done</option>
+          </select>
+        </label>
+        <label>Priority
+          <select id="f-priority">
+            <option value="high">High</option>
+            <option value="medium" selected>Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </label>
+        <label>Due date <input id="f-due" type="date"></label>
+      </div>
+      <p id="form-error" class="error" hidden></p>
+      <div class="dialog-actions">
+        <button type="button" id="delete-task" class="btn danger" hidden>Delete</button>
+        <div class="spacer"></div>
+        <button type="submit" class="btn primary" id="save-task">Save</button>
+      </div>
+    </form>
+
+    <section id="timeline-section" hidden>
+      <h4>Timeline</h4>
+      <form id="note-form" class="note-form">
+        <textarea id="note-body" rows="2" maxlength="5000" placeholder="Add an update…" required></textarea>
+        <button class="btn primary" type="submit">Post</button>
+      </form>
+      <ul id="timeline"></ul>
+    </section>
+  </dialog>
+
+  <script src="/app.js"></script>
+</body>
+</html>

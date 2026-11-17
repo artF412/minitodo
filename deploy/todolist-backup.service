@@ -1,0 +1,14 @@
+[Unit]
+Description=Todo Board daily backup (snapshot + rsync push)
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=todolist
+Group=todolist
+Environment=DB_PATH=/var/lib/todolist/todo.db
+Environment=BACKUP_DIR=/var/lib/todolist/backups
+Environment=SSH_KEY=/var/lib/todolist/.ssh/backup_ed25519
+# Replace with the backup user, host and the (relative) destination; rrsync pins the real path
+Environment=REMOTE=backupuser@192.168.x.x:./
+ExecStart=/usr/bin/node /opt/todolist/deploy/backup.mjs
