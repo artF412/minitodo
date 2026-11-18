@@ -164,6 +164,13 @@ export function buildServer(db) {
       return send(res, 200, r.update);
     }
 
+    // /api/updates/:id/history
+    if (parts[1] === 'updates' && parts[3] === 'history' && parts.length === 4 && method === 'GET') {
+      const h = store.history(id);
+      if (!h) throw new HttpError(404, 'Update not found');
+      return send(res, 200, h);
+    }
+
     // /api/export
     if (parts[1] === 'export' && parts.length === 2 && method === 'GET') {
       const date = new Date().toISOString().slice(0, 10);

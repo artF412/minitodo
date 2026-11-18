@@ -34,6 +34,13 @@ export function openDb(path) {
       created_at TEXT NOT NULL,
       edited_at  TEXT
     );
+    CREATE TABLE IF NOT EXISTS update_revisions (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      update_id  INTEGER NOT NULL REFERENCES updates(id) ON DELETE CASCADE,
+      body       TEXT NOT NULL,
+      saved_at   TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_revisions_update ON update_revisions(update_id, id);
     CREATE INDEX IF NOT EXISTS idx_updates_task ON updates(task_id, id);
     CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status, done_at);
   `);
@@ -139,8 +146,23 @@ export function makeStore(db) {
       if (!u) return { error: 'not_found' };
       if (u.kind !== 'note') return { error: 'not_editable' };
       if (Date.now() - Date.parse(u.created_at) > EDIT_WINDOW_MS) return { error: 'expired' };
+      if (body === u.body) return { update: u };
+      // keep the version being replaced, like a commit in history
+      db.prepare('INSERT INTO update_revisions (update_id, body, saved_at) VALUES (?, ?, ?)').run(
+        updateId, u.body, u.edited_at || u.created_at
+      );
       db.prepare('UPDATE updates SET body = ?, edited_at = ? WHERE id = ?').run(body, nowIso(), updateId);
       return { update: db.prepare('SELECT * FROM updates WHERE id = ?').get(updateId) };
+    },
+
+    // all versions of a note, newest first; the first entry is the current one
+    history(updateId) {
+      const u = db.prepare('SELECT * FROM updates WHERE id = ?').get(updateId);
+      if (!u) return null;
+      const old = db
+        .prepare('SELECT body, saved_at FROM update_revisions WHERE update_id = ? ORDER BY id DESC')
+        .all(updateId);
+      return [{ body: u.body, saved_at: u.edited_at || u.created_at, current: true }, ...old.map((r) => ({ ...r, current: false }))];
     },
 
     exportAll() {
@@ -148,6 +170,7 @@ export function makeStore(db) {
         exported_at: nowIso(),
         tasks: db.prepare('SELECT * FROM tasks ORDER BY id').all(),
         updates: db.prepare('SELECT * FROM updates ORDER BY id').all(),
+        update_revisions: db.prepare('SELECT * FROM update_revisions ORDER BY id').all(),
       };
     },
   };

@@ -189,7 +189,9 @@ function fillForm(task) {
   showError('');
 }
 
+let currentUpdates = [];
 function renderTimeline(updates) {
+  currentUpdates = updates;
   const ul = $('#timeline');
   ul.replaceChildren();
   for (const u of updates) {
@@ -197,19 +199,64 @@ function renderTimeline(updates) {
     if (u.kind === 'note' && Date.now() - Date.parse(u.created_at) < EDIT_WINDOW_MS) {
       when.append(el('button', { class: 'edit-link', type: 'button', text: 'Edit', onclick: () => editNote(u) }));
     }
-    ul.append(el('li', { class: u.kind }, when, el('div', { class: 'body', text: u.body })));
+    const bodyEl = el('div', { class: 'body', text: u.body });
+    const li = el('li', { class: u.kind }, when, bodyEl);
+    if (u.edited_at) {
+      const panel = el('div', { class: 'history', hidden: '' });
+      when.append(el('button', { class: 'edit-link', type: 'button', text: 'History', onclick: () => toggleHistory(u, panel) }));
+      li.append(panel);
+    }
+    li._u = u;
+    ul.append(li);
   }
 }
 
-async function editNote(u) {
-  const body = prompt('Edit update (allowed within 24 hours of posting):', u.body);
-  if (body === null || !body.trim() || body === u.body) return;
+async function toggleHistory(u, panel) {
+  if (!panel.hidden) { panel.hidden = true; return; }
   try {
-    await api('PATCH', `/api/updates/${u.id}`, { body });
-    await reloadDialogTask();
+    const versions = await api('GET', `/api/updates/${u.id}/history`);
+    const canRestore = Date.now() - Date.parse(u.created_at) < EDIT_WINDOW_MS;
+    panel.replaceChildren();
+    versions.forEach((v, i) => {
+      const head = el('div', { class: 'when', text: `v${versions.length - i} · ${fmtDateTime(v.saved_at)}${v.current ? ' · current' : ''}` });
+      if (!v.current && canRestore) {
+        head.append(el('button', { class: 'edit-link', type: 'button', text: 'Restore', onclick: async () => {
+          try {
+            await api('PATCH', `/api/updates/${u.id}`, { body: v.body });
+            await reloadDialogTask();
+          } catch (e) { alert(e.message); }
+        } }));
+      }
+      panel.append(el('div', { class: 'version' }, head, el('div', { class: 'body', text: v.body })));
+    });
+    panel.hidden = false;
   } catch (e) {
     alert(e.message);
   }
+}
+
+function editNote(u) {
+  const li = [...$('#timeline').children].find((n) => n._u === u);
+  if (!li) return;
+  const bodyEl = li.querySelector('.body');
+  const ta = el('textarea', { class: 'edit-area', rows: '3', maxlength: '5000' });
+  ta.value = u.body;
+  const save = el('button', { type: 'button', class: 'primary', text: 'Save', onclick: async () => {
+    const body = ta.value;
+    if (!body.trim()) return;
+    if (body === u.body) return renderTimeline(currentUpdates);
+    try {
+      await api('PATCH', `/api/updates/${u.id}`, { body });
+      await reloadDialogTask();
+    } catch (e) {
+      alert(e.message);
+    }
+  } });
+  const cancel = el('button', { type: 'button', text: 'Cancel', onclick: () => renderTimeline(currentUpdates) });
+  const box = el('div', { class: 'edit-box' }, ta, el('div', { class: 'edit-actions' }, save, cancel));
+  bodyEl.replaceWith(box);
+  li.querySelector('.edit-link')?.remove();
+  ta.focus();
 }
 
 async function reloadDialogTask() {

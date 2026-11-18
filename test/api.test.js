@@ -79,3 +79,13 @@ test('path traversal on static files is blocked', async () => {
   const res = await fetch(base + '/..%2Fserver.js');
   assert.equal(res.status, 404);
 });
+
+test('note edit history keeps previous versions', async () => {
+  const { data: t } = await call('POST', '/api/tasks', { title: 'H' });
+  const { data: n } = await call('POST', `/api/tasks/${t.id}/updates`, { body: 'v1' });
+  await call('PATCH', `/api/updates/${n.id}`, { body: 'v2' });
+  await call('PATCH', `/api/updates/${n.id}`, { body: 'v3' });
+  const { data: h } = await call('GET', `/api/updates/${n.id}/history`);
+  assert.deepEqual(h.map((v) => v.body), ['v3', 'v2', 'v1']);
+  assert.equal(h[0].current, true);
+});
