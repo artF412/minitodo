@@ -265,6 +265,44 @@ async function reloadDialogTask() {
   return task;
 }
 
+// Unsaved drafts survive accidental close (kept in memory only; lost on reload).
+const drafts = new Map();
+const draftKey = () => currentTaskId ?? 'new';
+
+function getDraft() {
+  const key = draftKey();
+  if (!drafts.has(key)) drafts.set(key, { form: null, note: '' });
+  return drafts.get(key);
+}
+
+dialog.addEventListener('input', (e) => {
+  const d = getDraft();
+  if (e.target.closest('#task-form')) {
+    d.form = {
+      title: $('#f-title').value,
+      description: $('#f-desc').value,
+      status: $('#f-status').value,
+      priority: $('#f-priority').value,
+      due: $('#f-due').value,
+    };
+  } else if (e.target.closest('#note-form')) {
+    d.note = $('#note-body').value;
+  }
+});
+
+function applyDraft() {
+  const d = drafts.get(draftKey());
+  if (!d) return;
+  if (d.form) {
+    $('#f-title').value = d.form.title;
+    $('#f-desc').value = d.form.description;
+    $('#f-status').value = d.form.status;
+    $('#f-priority').value = d.form.priority;
+    $('#f-due').value = d.form.due;
+  }
+  $('#note-body').value = d.note;
+}
+
 async function openTask(id) {
   try {
     currentTaskId = id;
@@ -274,6 +312,7 @@ async function openTask(id) {
     $('#delete-task').hidden = false;
     $('#timeline-section').hidden = false;
     $('#note-body').value = '';
+    applyDraft();
     renderTimeline(task.updates);
     dialog.showModal();
   } catch (e) {
@@ -287,6 +326,8 @@ function openNew() {
   fillForm(null);
   $('#delete-task').hidden = true;
   $('#timeline-section').hidden = true;
+  $('#note-body').value = '';
+  applyDraft();
   dialog.showModal();
   $('#f-title').focus();
 }
@@ -308,6 +349,8 @@ $('#task-form').addEventListener('submit', async (e) => {
   try {
     if (currentTaskId) await api('PATCH', `/api/tasks/${currentTaskId}`, payload);
     else await api('POST', '/api/tasks', payload);
+    const d = drafts.get(draftKey());
+    if (d) d.form = null; // form saved; keep any unposted note
     dialog.close();
   } catch (err) {
     showError(err.message);
@@ -318,6 +361,7 @@ $('#delete-task').addEventListener('click', async () => {
   if (!confirm('Delete this task permanently? This cannot be undone (except from a backup).')) return;
   try {
     await api('DELETE', `/api/tasks/${currentTaskId}`);
+    drafts.delete(draftKey());
     dialog.close();
   } catch (err) {
     showError(err.message);
@@ -330,6 +374,7 @@ $('#note-form').addEventListener('submit', async (e) => {
   try {
     await api('POST', `/api/tasks/${currentTaskId}/updates`, { body });
     $('#note-body').value = '';
+    getDraft().note = '';
     await reloadDialogTask();
   } catch (err) {
     showError(err.message);
